@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Udasinagri</title>
+<style>
+:root{--bg:#0b0f14;--panel:#121821;--line:#1f2a36;--txt:#d7e0ea;--mut:#7f8fa3;--up:#19c37d;--dn:#ff4d5e;--acc:#f5b942}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:12.5px/1.35 "JetBrains Mono",Consolas,Menlo,monospace}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:8px 12px;background:#0f141b;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+h1{font-size:15px;margin:0;color:var(--acc);letter-spacing:.5px}
+#clock{font-size:15px;font-weight:700}
+.mk{display:flex;gap:6px;flex-wrap:wrap}
+.pill{padding:2px 7px;border-radius:10px;border:1px solid var(--line);font-size:11px}
+.pill.open{color:var(--up);border-color:#145c3d}.pill.closed{color:var(--mut)}
+.fx{color:var(--mut);font-size:11.5px}.fx b{color:var(--txt)}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(1150px,1fr));gap:10px;padding:10px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow-x:auto}
+section h2{margin:0;padding:6px 10px;font-size:12.5px;color:var(--acc);background:#16202b;border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.6px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:4px 7px;border-bottom:1px solid #18212c;white-space:nowrap;text-align:right}
+th{color:var(--mut);font-weight:500;font-size:11px;background:#131b24}
+td.l,th.l{text-align:left}
+tr:hover td{background:#17212d}
+.up{color:var(--up)}.dn{color:var(--dn)}
+tr.big.upr td{background:rgba(25,195,125,.13)}tr.big.dnr td{background:rgba(255,77,94,.13)}
+tr.big td.pct{font-weight:700}
+.na{color:#9a7b4f}.spot{color:#6cb6ff;font-size:10px;border:1px solid #2a4d73;border-radius:3px;padding:0 3px;margin-left:4px}
+.note{color:var(--mut);font-size:10.5px;max-width:420px;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.src{color:var(--mut);font-size:10.5px;text-align:left}
+footer{color:var(--mut);padding:6px 12px 14px;font-size:11px}
+.price{font-weight:700}
+</style></head><body>
+<header>
+  <h1>◆ Udasinagri</h1>
+  <div id="clock">--:--:-- IST</div>
+  <div class="mk" id="mk"></div>
+  <div class="fx" id="fx"></div>
+  <div class="fx" id="upd"></div>
+</header>
+<main id="main"></main>
+<footer><b style="color:var(--acc)">Live indicative prices from public sources; some feeds delayed. Not for trading.</b><br>Sources: NCDEX (live quotes &amp; spot prices), MCX (spot), Bursa Malaysia (FCPO, 15-min delayed), Euronext (MATIF), Yahoo Finance (CBOT/ICE US, FX), investing.com (ICE London, ICE canola). Delayed/EOD data – not for trading. Highlight = |move| ≥ 2%. ₹/qtl = native price × live FX ÷ unit conversion (indicative). Market hours ignore exchange holidays.</footer>
+<script>
+const DATA_URL='https://raw.githubusercontent.com/jbtechfin/udasinagri/data/prices.json';
+const fmt=(v,d)=>v==null||isNaN(v)?'n/a':Number(v).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+const dp=v=>v==null?2:(Math.abs(v)>=1000?0:2);
+const ist=s=>{if(!s)return'n/a';const d=new Date(s);return d.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false})};
+function tick(){document.getElementById('clock').textContent=new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})+' IST'}
+setInterval(tick,1000);tick();
+async function load(){
+  let j=null;const urls=(['localhost','127.0.0.1'].includes(location.hostname))?['/api/prices']:[DATA_URL+'?t='+Math.floor(Date.now()/30000),'prices.json'];
+  for(const u of urls){try{const r=await fetch(u,{cache:'no-store'});if(r.ok){j=await r.json();if(j&&j.rows)break;j=null}}catch(e){}}
+  if(!j){document.getElementById('upd').textContent='data unavailable – retrying';return}
+  document.getElementById('mk').innerHTML=Object.entries(j.markets).map(([k,v])=>`<span class="pill ${v?'open':'closed'}">${k}: ${v?'OPEN':'CLOSED'}</span>`).join('');
+  const f=j.fx;document.getElementById('fx').innerHTML=['USD','MYR','EUR','GBP','CAD'].map(c=>`${c}/INR <b>${fmt(f[c],c==='USD'?3:3)}</b>`).join(' · ');
+  document.getElementById('upd').innerHTML='data as of <b>'+new Date(j.published_at||j.server_time).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})+' IST</b> · page checks every 45s';
+  const groups={};j.rows.forEach(r=>(groups[r.group]=groups[r.group]||[]).push(r));
+  document.getElementById('main').innerHTML=Object.entries(groups).map(([g,rows])=>`<section><h2>${g}</h2><table>
+  <tr><th class="l">Commodity</th><th class="l">Market</th><th class="l">Contract</th><th>Last</th><th class="l">Unit</th><th>Chg</th><th>%Chg</th><th>≈ ₹/qtl</th><th>Updated (IST)</th><th class="l">Source</th><th class="l">Note</th></tr>
+  ${rows.map(r=>{const na=r.last==null;const cls=r.pct==null?'':(r.pct>0?'up':(r.pct<0?'dn':''));const big=r.pct!=null&&Math.abs(r.pct)>=2;
+   return `<tr class="${big?'big '+(r.pct>0?'upr':'dnr'):''}"><td class="l">${r.commodity}${r.kind==='spot'?'<span class="spot">SPOT</span>':''}</td><td class="l">${r.market}</td><td class="l">${r.contract||''}</td>
+   <td class="price ${na?'na':''}">${na?'n/a':fmt(r.last,dp(r.last))}</td><td class="l">${r.unit}</td>
+   <td class="${cls}">${r.change==null?'–':(r.change>0?'+':'')+fmt(r.change,dp(r.last))}</td><td class="pct ${cls}">${r.pct==null?'–':(r.pct>0?'+':'')+fmt(r.pct,2)+'%'}</td>
+   <td>${r.inr_qtl==null?'–':fmt(r.inr_qtl,0)}</td><td>${r.date_only?ist(r.updated).split(',')[0]+' (EOD)':ist(r.updated)}</td><td class="src">${r.source}</td><td class="note ${na?'na':''}" title="${(r.note||'').replace(/"/g,'&quot;')}">${r.note||''}</td></tr>`}).join('')}
+  </table></section>`).join('');
+}
+load();setInterval(load,45000);
+</script></body></html>
